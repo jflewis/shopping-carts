@@ -1,12 +1,40 @@
 (ns shopping-cart-clj.core
+  (:require [clojure.string :as s])
   (:gen-class))
 
 
-(def items [{:item "basket" :price 5.0}
-               {:item "ball" :price 10.0}
-               {:item "computer" :price 12000.0}])
 
-(def shopping-cart [])
+(def headers->keywords {"Item-name" :item
+                        "price" :price})
+
+(def filename "../inventory/inventory.csv")
+
+
+(defn str->double
+  [str]
+  (Double. str))
+
+;;CSV conversion
+(def conversions {:item identity
+                  :price str->double })
+
+(defn parse
+  [string]
+  (map #(s/split % #",")
+       (s/split string #"\n")))
+
+(defn get-inventory
+  [rows]
+  (let [headers (map #(get headers->keywords %) (first rows))
+        unmapped-rows (next rows)]
+    (map (fn [unmapped-row]
+           (into {}
+                 (map (fn [header column]
+                        [header ((get conversions header) column)])
+                      headers
+                      unmapped-row)))
+         unmapped-rows)))
+
 
 (defn String->Number [str]
   (let [n (read-string str)]
@@ -24,6 +52,7 @@
   [cart]
   (let [ total (reduce + 0 (map :price cart ))]
     total))
+
 
 
 (defn list-items
@@ -53,12 +82,14 @@
     (if (nil? item)
       (recur (String->Number (get-input "Not a Number, try again:")))
       (conj  cart (get inventory (- item 1))))))
+
+(defn remove-index [index collection]
+  (loop [iter 0 final-col [] remaining collection]
+    (if (= index iter )
+      (vec (flatten (cons final-col (rest remaining))))
+      (recur (inc iter) (conj final-col (first remaining)) (next remaining)))))
     
-(defn remove-item [inventory]
-  (loop [item (String->Number (get-input "Enter product # to remove"))]
-    (if (nil? item)
-      (recur (String->Number (get-input "Not a Number, try again:")))
-      (remove-index (- item 1) inventory))))
+
 
 (defn remove-index [index collection]
   (loop [iter 0 final-col [] remaining collection]
@@ -71,6 +102,9 @@
   (println "Your items\n----------")
   (list-items cart)
   (printf "Your total comes to: $%.2f" (shopping-cart-total cart)))
+
+(def items (into [] (get-inventory (parse (slurp filename)))))
+(def shopping-cart [])
 
 (defn -main
   "Entry point into the program"
